@@ -42,7 +42,9 @@ exports.handler=async e=>{try{
  if(r==='logout')return json(200,{ok:true},{'set-cookie':ck('',0)});
  if(r==='paystack-webhook'&&m==='POST')return require('./_fees_cbt').webhook(e);
  if(r==='setup'&&m==='POST'){
-  if(!process.env.SETUP_KEY||e.headers['x-setup-key']!==process.env.SETUP_KEY)return json(403,{error:'Not allowed.'});
+  const want=String(process.env.SETUP_KEY||'').trim(),got=String(e.headers['x-setup-key']||'').trim();
+  if(!want)return json(403,{error:'The server cannot see SETUP_KEY. In Netlify, check the variable name and that the Functions scope is ticked, then deploy again.'});
+  if(got!==want)return json(403,{error:'That setup key does not match the SETUP_KEY saved in Netlify.'});
   if((await sql`select 1 from users limit 1`).length)return json(403,{error:'Setup has already been done.'});
   const un=String(b.username||'').trim().toLowerCase();
   if(!UN.test(un)||!b.full_name||String(b.password||'').length<10)return json(400,{error:'Use a username (letters/numbers) and a password of 10+ characters.'});
