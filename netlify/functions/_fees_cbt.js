@@ -1,5 +1,5 @@
-const crypto=require('crypto');
-const {sql,tx,json}=require('./_lib');
+import crypto from 'node:crypto';
+import {sql,tx,json} from './_lib.js';
 
 const KEY=()=>process.env.PAYSTACK_SECRET_KEY||'';
 const NOSET='Set the session and term first (Tools > Configuration > Set Session and Term).';
@@ -349,10 +349,10 @@ async function cbt(e,r,m,b,u,Q){
   return json(404,{error:'Not found.'});
 }
 
-module.exports=async function(e,r,m,b,u){
+export default async function(e,r,m,b,u){
   if(!r.startsWith('fees/')&&!r.startsWith('cbt/'))return null;
   const Q=e.queryStringParameters||{};
   return r.startsWith('fees/')?fees(e,r,m,b,u,Q):cbt(e,r,m,b,u,Q);
 };
-module.exports.webhook=webhook;
-module.exports._test={shuf,cleanAns};
+export {webhook};
+export const _test={shuf,cleanAns};

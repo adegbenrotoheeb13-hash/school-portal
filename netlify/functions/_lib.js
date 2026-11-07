@@ -1,7 +1,7 @@
-const crypto=require('crypto');
+import crypto from 'node:crypto';
 // Netlify Database (Postgres built into Netlify). The connection is set up by Netlify; no URL or password to manage.
 let _db=null;
-const db=async()=>{if(!_db){const m=await import('@netlify/database');_db=m.getDatabase()}return _db};
+const db=async()=>{if(!_db){const m=await import('@netlify/database');const cs=process.env.DB_CONNECTION_STRING;_db=cs?m.getDatabase({connectionString:cs}):m.getDatabase()}return _db};
 const sql=(strings,...vals)=>db().then(d=>d.sql(strings,...vals));
 sql.unsafe=(text,params)=>db().then(d=>d.sql.unsafe(text,params||[]));
 // Run several statements as one all-or-nothing transaction: tx(async c=>{await c.query('insert ... $1',[x])})
@@ -14,4 +14,4 @@ const check=(pw,h)=>{const [s,k]=h.split(':');return crypto.timingSafeEqual(cryp
 const cookies=e=>Object.fromEntries((e.headers.cookie||'').split(';').map(c=>c.trim().split('=')).filter(c=>c[0]));
 const user=async e=>{const t=verify(cookies(e).schoolportal);if(!t)return null;const r=await sql`select id,username,full_name,role,must_change_password from users where id=${t.uid} and active`;return r[0]||null};
 const json=(s,o,h={})=>({statusCode:s,headers:{'content-type':'application/json','cache-control':'no-store',...h},body:JSON.stringify(o)});
-module.exports={sql,tx,sign,hash,check,user,json};
+export {sql,tx,sign,hash,check,user,json};

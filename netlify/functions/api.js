@@ -1,4 +1,7 @@
-const crypto=require('crypto');const {sql,sign,hash,check,user,json}=require('./_lib');
+import crypto from 'node:crypto';
+import {sql,sign,hash,check,user,json} from './_lib.js';
+import feesCbt,{webhook} from './_fees_cbt.js';
+import {withLambda} from '@netlify/aws-lambda-compat';
 const ROLES=['admin','teacher','parent','student'],UN=/^[a-z0-9._-]{3,40}$/;
 const ck=(t,age)=>`schoolportal=${t}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${age}`;
 const KEYS=['grading','position','next_term','promotion_cutoff','session','term','term_start','term_end','logo','signature','school_name','bank_details'];
@@ -27,7 +30,7 @@ async function addStudent(b){
  let st;try{st=(await sql`insert into students(admission_no,first_name,last_name,gender,dob,class_id) values(${adm},${fn},${ln},${g},${b.dob||null}::date,${cid}) returning id`)[0]}catch(x){throw new Error(x.code==='23505'?'Admission number '+adm+' already exists.':'Could not save this pupil.')}
  if(b.parent_username){const p=(await sql`select id from users where username=${String(b.parent_username).trim().toLowerCase()} and role='parent'`)[0];if(!p)throw new Error('Parent username not found (the pupil was added).');await sql`insert into parent_students(parent_id,student_id) values(${p.id},${st.id}) on conflict do nothing`}
 }
-exports.handler=async e=>{try{
+const handler=async e=>{try{
  const r=e.path.split('/api/').pop().replace(/\/$/,''),m=e.httpMethod,b=e.body?JSON.parse(e.body):{};
  if(r==='login'&&m==='POST'){
   const un=String(b.username||'').trim().toLowerCase();
@@ -40,7 +43,7 @@ exports.handler=async e=>{try{
   return json(200,{role:u.role,must_change_password:u.must_change_password},{'set-cookie':ck(sign({uid:u.id,exp:Date.now()+6048e5}),604800)});
  }
  if(r==='logout')return json(200,{ok:true},{'set-cookie':ck('',0)});
- if(r==='paystack-webhook'&&m==='POST')return require('./_fees_cbt').webhook(e);
+ if(r==='paystack-webhook'&&m==='POST')return webhook(e);
  if(r==='setup'&&m==='POST'){
   const want=String(process.env.SETUP_KEY||'').trim(),got=String(e.headers['x-setup-key']||'').trim();
   if(!want)return json(403,{error:'The server cannot see SETUP_KEY. In Netlify, check the variable name and that the Functions scope is ticked, then deploy again.'});
@@ -54,7 +57,7 @@ exports.handler=async e=>{try{
   }catch(x){console.error(x);return json(500,{error:'Setup failed: '+String((x&&x.message)||x).slice(0,300)})}
  }
  const u=await user(e);if(!u)return json(401,{error:'Please sign in.'});
- {const x=await require('./_fees_cbt')(e,r,m,b,u);if(x)return x}
+ {const x=await feesCbt(e,r,m,b,u);if(x)return x}
  if(r==='me')return json(200,{user:u});
  if(r==='change-password'&&m==='POST'){
   const p=(await sql`select password_hash from users where id=${u.id}`)[0];
@@ -239,3 +242,5 @@ exports.handler=async e=>{try{
  if(r==='backup'&&m==='GET'){const out={exported_at:new Date().toISOString(),tables:{users:await sql`select id,username,full_name,role,email,phone,active,created_at from users`,students:await sql`select id,user_id,admission_no,first_name,last_name,dob,gender,class_id,status,created_at from students`}};for(const t of['classes','subjects','class_subjects','parent_students','teacher_assign','settings','scores','ratings','report_comments','published_results','attendance','absence_alerts','events','lesson_notes','homework','daily_reports','health_records','pickup_persons','pickup_log','comm_book','timetable','admissions','transport_routes','student_transport','comment_bank','messages','fee_structure','fee_payments','cbt_exams','cbt_questions','cbt_attempts'])out.tables[t]=await sql.unsafe('select * from '+t);return json(200,out)}
  return json(404,{error:'Not found.'});
 }catch(x){console.error(x);return json(500,{error:'Server error.'})}};
+
+export default withLambda(handler);
