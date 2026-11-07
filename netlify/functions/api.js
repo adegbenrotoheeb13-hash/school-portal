@@ -45,11 +45,13 @@ exports.handler=async e=>{try{
   const want=String(process.env.SETUP_KEY||'').trim(),got=String(e.headers['x-setup-key']||'').trim();
   if(!want)return json(403,{error:'The server cannot see SETUP_KEY. In Netlify, check the variable name and that the Functions scope is ticked, then deploy again.'});
   if(got!==want)return json(403,{error:'That setup key does not match the SETUP_KEY saved in Netlify.'});
+  try{
   if((await sql`select 1 from users limit 1`).length)return json(403,{error:'Setup has already been done.'});
   const un=String(b.username||'').trim().toLowerCase();
   if(!UN.test(un)||!b.full_name||String(b.password||'').length<10)return json(400,{error:'Use a username (letters/numbers) and a password of 10+ characters.'});
   await sql`insert into users(username,full_name,role,password_hash,must_change_password) values(${un},${b.full_name},'admin',${hash(b.password)},false)`;
   return json(200,{ok:true});
+  }catch(x){console.error(x);return json(500,{error:'Setup failed: '+String((x&&x.message)||x).slice(0,300)})}
  }
  const u=await user(e);if(!u)return json(401,{error:'Please sign in.'});
  {const x=await require('./_fees_cbt')(e,r,m,b,u);if(x)return x}
