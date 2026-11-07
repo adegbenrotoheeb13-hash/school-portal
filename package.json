@@ -1,1 +1,1 @@
-{"name":"school-portal","private":true,"dependencies":{"@netlify/database":"latest"}}
+{"name":"school-portal","private":true,"type":"module","dependencies":{"@netlify/database":"latest","@netlify/aws-lambda-compat":"latest"}}
